@@ -1,0 +1,9 @@
+{
+	"name": "adfprojectanshu",
+	"location": "uksouth",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "b98d5df1-39f0-4825-8ae6-44651b72d98a",
+		"tenantId": "2a33feca-3e03-44c5-8425-ccfdf6ee8504"
+	}
+}

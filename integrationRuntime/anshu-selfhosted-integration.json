@@ -1,0 +1,6 @@
+{
+	"name": "anshu-selfhosted-integration",
+	"properties": {
+		"type": "SelfHosted"
+	}
+}

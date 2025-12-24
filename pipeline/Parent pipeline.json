@@ -1,0 +1,105 @@
+{
+	"name": "Parent pipeline",
+	"properties": {
+		"activities": [
+			{
+				"name": "ExecuteOnPrem",
+				"type": "ExecutePipeline",
+				"dependsOn": [],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "OnPremIngestion",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "ExecuteAPI",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "ExecuteOnPrem",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "API_Ingestion",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "Execute_Incremental_Ingestion",
+				"type": "ExecutePipeline",
+				"dependsOn": [
+					{
+						"activity": "ExecuteAPI",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"pipeline": {
+						"referenceName": "SQLToDatalake",
+						"type": "PipelineReference"
+					},
+					"waitOnCompletion": true
+				}
+			},
+			{
+				"name": "FailureAlert",
+				"type": "WebActivity",
+				"dependsOn": [
+					{
+						"activity": "Execute_Incremental_Ingestion",
+						"dependencyConditions": [
+							"Failed",
+							"Skipped",
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"method": "POST",
+					"url": {
+						"value": "https://prod-40.uksouth.logic.azure.com:443/workflows/5228602edd6e41e08bac5021ce481e93/triggers/When_an_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_an_HTTP_request_is_received%2Frun&sv=1.0&sig=n0hVXPrvttF54IaKkFO-hDE-R0icfPmJprxAVW5mrIU",
+						"type": "Expression"
+					},
+					"body": {
+						"value": "{\n    \"pipelineName\" : \"@{pipeline().Pipeline}\",\n    \"runId\" : \"@{pipeline().RunId}\",\n    \"errorMessage\" : \"@{if(\n      equals(activity('Execute_Incremental_Ingestion').Status,'Failed'),\n      activity('Execute_Incremental_Ingestion').error.message,\n      'No error'\n  )}\"\n}",
+						"type": "Expression"
+					}
+				}
+			}
+		],
+		"annotations": [],
+		"lastPublishTime": "2025-12-23T14:51:32Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
