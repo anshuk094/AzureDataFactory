@@ -1,0 +1,40 @@
+{
+	"name": "parametrized_source_path",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "AzureDataLakeLinkedService",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"year": {
+				"type": "string",
+				"defaultValue": "2025"
+			},
+			"month": {
+				"type": "string",
+				"defaultValue": "01"
+			},
+			"day": {
+				"type": "string",
+				"defaultValue": "30"
+			}
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"folderPath": {
+					"value": "@concat('data','/',dataset().year,'/',dataset().month,'/',dataset().day)",
+					"type": "Expression"
+				},
+				"fileSystem": "raw"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": []
+	}
+}
