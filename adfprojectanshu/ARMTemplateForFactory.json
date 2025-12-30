@@ -346,6 +346,376 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/PL_CompletePipelineIngestionGold')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "SetYearVariable",
+						"type": "SetVariable",
+						"dependsOn": [],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vYear",
+							"value": {
+								"value": "@formatDateTime(pipeline().parameters.pRunDate,'yyyy')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set variable Month",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "SetYearVariable",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vMonth",
+							"value": {
+								"value": "@formatDateTime(pipeline().parameters.pRunDate,'MM')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Set variable Day",
+						"type": "SetVariable",
+						"dependsOn": [
+							{
+								"activity": "Set variable Month",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"variableName": "vDay",
+							"value": {
+								"value": "@formatDateTime(pipeline().parameters.pRunDate,'dd')",
+								"type": "Expression"
+							}
+						}
+					},
+					{
+						"name": "Get Metadata Raw Directory",
+						"description": "To check if folder exists or not",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "Set variable Day",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "parametrized_source_path",
+								"type": "DatasetReference",
+								"parameters": {
+									"year": {
+										"value": "@variables('vYear')",
+										"type": "Expression"
+									},
+									"month": {
+										"value": "@variables('vMonth')",
+										"type": "Expression"
+									},
+									"day": {
+										"value": "@variables('vDay')",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"exists"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "DelimitedTextReadSettings"
+							}
+						}
+					},
+					{
+						"name": "Get Metadata FileName",
+						"type": "GetMetadata",
+						"dependsOn": [
+							{
+								"activity": "Get Metadata Raw Directory",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"dataset": {
+								"referenceName": "parametrized_source_path",
+								"type": "DatasetReference",
+								"parameters": {
+									"year": {
+										"value": "@variables('vYear')",
+										"type": "Expression"
+									},
+									"month": {
+										"value": "@variables('vMonth')",
+										"type": "Expression"
+									},
+									"day": {
+										"value": "@variables('vDay')",
+										"type": "Expression"
+									}
+								}
+							},
+							"fieldList": [
+								"childItems"
+							],
+							"storeSettings": {
+								"type": "AzureBlobFSReadSettings",
+								"recursive": true,
+								"enablePartitionDiscovery": false
+							},
+							"formatSettings": {
+								"type": "DelimitedTextReadSettings"
+							}
+						}
+					},
+					{
+						"name": "ForEach",
+						"type": "ForEach",
+						"dependsOn": [
+							{
+								"activity": "Get Metadata FileName",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"items": {
+								"value": "@activity('Get Metadata FileName').output.childItems",
+								"type": "Expression"
+							},
+							"batchCount": 5,
+							"activities": [
+								{
+									"name": "If Condition",
+									"type": "IfCondition",
+									"dependsOn": [],
+									"userProperties": [],
+									"typeProperties": {
+										"expression": {
+											"value": "@endswith(item().name,'.csv' )",
+											"type": "Expression"
+										},
+										"ifTrueActivities": [
+											{
+												"name": "Copy data to Silver Layer",
+												"type": "Copy",
+												"dependsOn": [],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"source": {
+														"type": "DelimitedTextSource",
+														"storeSettings": {
+															"type": "AzureBlobFSReadSettings",
+															"recursive": true,
+															"enablePartitionDiscovery": false
+														},
+														"formatSettings": {
+															"type": "DelimitedTextReadSettings"
+														}
+													},
+													"sink": {
+														"type": "DelimitedTextSink",
+														"storeSettings": {
+															"type": "AzureBlobFSWriteSettings"
+														},
+														"formatSettings": {
+															"type": "DelimitedTextWriteSettings",
+															"quoteAllText": true,
+															"fileExtension": ".txt"
+														}
+													},
+													"enableStaging": false,
+													"translator": {
+														"type": "TabularTranslator",
+														"typeConversion": true,
+														"typeConversionSettings": {
+															"allowDataTruncation": true,
+															"treatBooleanAsNumber": false
+														}
+													}
+												},
+												"inputs": [
+													{
+														"referenceName": "parametrized_raw_path_dataset",
+														"type": "DatasetReference",
+														"parameters": {
+															"year": {
+																"value": "@variables('vYear')",
+																"type": "Expression"
+															},
+															"month": {
+																"value": "@variables('vMonth')",
+																"type": "Expression"
+															},
+															"day": {
+																"value": "@variables('vDay')",
+																"type": "Expression"
+															}
+														}
+													}
+												],
+												"outputs": [
+													{
+														"referenceName": "parametrized_silver_path_dataset",
+														"type": "DatasetReference",
+														"parameters": {
+															"year": {
+																"value": "@variables('vYear')",
+																"type": "Expression"
+															},
+															"month": {
+																"value": "@variables('vMonth')",
+																"type": "Expression"
+															},
+															"day": {
+																"value": "@variables('vDay')",
+																"type": "Expression"
+															}
+														}
+													}
+												]
+											},
+											{
+												"name": "Data flow",
+												"type": "ExecuteDataFlow",
+												"dependsOn": [
+													{
+														"activity": "Copy data to Silver Layer",
+														"dependencyConditions": [
+															"Succeeded"
+														]
+													}
+												],
+												"policy": {
+													"timeout": "0.12:00:00",
+													"retry": 0,
+													"retryIntervalInSeconds": 30,
+													"secureOutput": false,
+													"secureInput": false
+												},
+												"userProperties": [],
+												"typeProperties": {
+													"dataflow": {
+														"referenceName": "dataflowSilverLayerTransformation",
+														"type": "DataFlowReference",
+														"parameters": {},
+														"datasetParameters": {
+															"sourceSilverLayer": {
+																"year": "2025",
+																"month": "01",
+																"day": "30"
+															},
+															"sinkGold": {}
+														}
+													},
+													"staging": {},
+													"compute": {
+														"coreCount": 8,
+														"computeType": "General"
+													},
+													"traceLevel": "Fine"
+												}
+											}
+										]
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"pRunDate": {
+						"type": "string",
+						"defaultValue": "2025-01-30"
+					}
+				},
+				"variables": {
+					"vYear": {
+						"type": "String",
+						"defaultValue": "2025"
+					},
+					"vMonth": {
+						"type": "String",
+						"defaultValue": "01"
+					},
+					"vDay": {
+						"type": "String",
+						"defaultValue": "30"
+					}
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/parametrized_source_path')]",
+				"[concat(variables('factoryId'), '/datasets/parametrized_raw_path_dataset')]",
+				"[concat(variables('factoryId'), '/datasets/parametrized_silver_path_dataset')]",
+				"[concat(variables('factoryId'), '/dataflows/dataflowSilverLayerTransformation')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/PL_Copy_Git_Files_If_Not_Exists')]",
 			"type": "Microsoft.DataFactory/factories/pipelines",
 			"apiVersion": "2018-06-01",
@@ -1657,6 +2027,149 @@
 			]
 		},
 		{
+			"name": "[concat(parameters('factoryName'), '/parametrized_raw_path_dataset')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeLinkedService",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"year": {
+						"type": "string",
+						"defaultValue": "2025"
+					},
+					"month": {
+						"type": "string",
+						"defaultValue": "01"
+					},
+					"day": {
+						"type": "string",
+						"defaultValue": "30"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@item().name",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@concat('data','/',dataset().year,'/',dataset().month,'/',dataset().day)",
+							"type": "Expression"
+						},
+						"fileSystem": "raw"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeLinkedService')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/parametrized_silver_path_dataset')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeLinkedService",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"year": {
+						"type": "string",
+						"defaultValue": "2025"
+					},
+					"month": {
+						"type": "string",
+						"defaultValue": "01"
+					},
+					"day": {
+						"type": "string",
+						"defaultValue": "30"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@item().name",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@concat(dataset().year,'/',dataset().month,'/',dataset().day)",
+							"type": "Expression"
+						},
+						"fileSystem": "silver"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeLinkedService')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/parametrized_source_path')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "AzureDataLakeLinkedService",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"year": {
+						"type": "string",
+						"defaultValue": "2025"
+					},
+					"month": {
+						"type": "string",
+						"defaultValue": "01"
+					},
+					"day": {
+						"type": "string",
+						"defaultValue": "30"
+					}
+				},
+				"annotations": [],
+				"type": "DelimitedText",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"folderPath": {
+							"value": "@concat('data','/',dataset().year,'/',dataset().month,'/',dataset().day)",
+							"type": "Expression"
+						},
+						"fileSystem": "raw"
+					},
+					"columnDelimiter": ",",
+					"escapeChar": "\\",
+					"firstRowAsHeader": true,
+					"quoteChar": "\""
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeLinkedService')]"
+			]
+		},
+		{
 			"name": "[concat(parameters('factoryName'), '/AzureDataLakeLinkedService')]",
 			"type": "Microsoft.DataFactory/factories/linkedServices",
 			"apiVersion": "2018-06-01",
@@ -2200,6 +2713,66 @@
 				"[concat(variables('factoryId'), '/datasets/ds_dim_passenger_source')]",
 				"[concat(variables('factoryId'), '/datasets/ds_fact_source')]",
 				"[concat(variables('factoryId'), '/datasets/ds_dim_airport')]",
+				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeLinkedService')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/dataflowSilverLayerTransformation')]",
+			"type": "Microsoft.DataFactory/factories/dataflows",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"type": "MappingDataFlow",
+				"typeProperties": {
+					"sources": [
+						{
+							"dataset": {
+								"referenceName": "parametrized_silver_path_dataset",
+								"type": "DatasetReference"
+							},
+							"name": "sourceSilverLayer"
+						}
+					],
+					"sinks": [
+						{
+							"linkedService": {
+								"referenceName": "AzureDataLakeLinkedService",
+								"type": "LinkedServiceReference"
+							},
+							"name": "sinkGold"
+						}
+					],
+					"transformations": [
+						{
+							"name": "alterRow"
+						}
+					],
+					"scriptLines": [
+						"source(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     ignoreNoFilesFound: false) ~> sourceSilverLayer",
+						"sourceSilverLayer alterRow(upsertIf(1==1)) ~> alterRow",
+						"alterRow sink(allowSchemaDrift: true,",
+						"     validateSchema: false,",
+						"     format: 'delta',",
+						"     fileSystem: 'gold',",
+						"     mergeSchema: false,",
+						"     autoCompact: false,",
+						"     optimizedWrite: false,",
+						"     vacuum: 0,",
+						"     deletable: false,",
+						"     insertable: true,",
+						"     updateable: false,",
+						"     upsertable: false,",
+						"     umask: 0022,",
+						"     preCommands: [],",
+						"     postCommands: [],",
+						"     skipDuplicateMapInputs: true,",
+						"     skipDuplicateMapOutputs: true) ~> sinkGold"
+					]
+				}
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/parametrized_silver_path_dataset')]",
 				"[concat(variables('factoryId'), '/linkedServices/AzureDataLakeLinkedService')]"
 			]
 		}
